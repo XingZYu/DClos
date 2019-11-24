@@ -181,9 +181,9 @@ class SimpleMonitor13(app_manager.RyuApp):
         
 
         # no match in table 0, goto table 3
-        # match = parser.OFPMatch() 
-        # actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
-        # self.goto_table(datapath, 0, match, gototable=3, now_table=0)
+        match = parser.OFPMatch() 
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
+        self.goto_table(datapath, 0, match, gototable=3, now_table=0)
 
         # no match in table 3, packetin
         self.add_flow(datapath, 0, match, actions, table_id=3)
