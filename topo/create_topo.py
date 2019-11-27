@@ -4,6 +4,9 @@ from mininet.cli import CLI
 from mininet.link import TCLink
 from mininet.log import setLogLevel
 import json
+import sys
+sys.path.append("..")
+from SFlow.enable_sflow import EnableSFlow
 
 def topology(remoteip, ofversion, file = '../config/topo.json'):
     net = Mininet(controller=RemoteController,switch=OVSSwitch)
@@ -35,8 +38,11 @@ def topology(remoteip, ofversion, file = '../config/topo.json'):
     
     print("***Starting network")
     c1.start()
+     
+    EnableSFlow(net, sampling_rate=10, polling_rate=10)
     CLI(net)
-
+    
+	
     print("***Stoping network")
     net.stop()
 

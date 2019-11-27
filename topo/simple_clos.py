@@ -26,7 +26,6 @@ class SimpleClos(Topo):
                 self.addLink(sw, host, bw = host_bw)
         
         #link tor sw and pod sw
-
         for pod_sw in pods:
             for tor_sw in tors:
                 self.addLink(pod_sw, tor_sw, bw = tor_bw)

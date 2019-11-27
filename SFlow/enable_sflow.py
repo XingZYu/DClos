@@ -9,7 +9,7 @@ import array
 import struct
 import sys
 
-def EnableSFlow(net):
+def EnableSFlow(net, sampling_rate, polling_rate):
   def getIfInfo(dst):
     is_64bits = sys.maxsize > 2**32
     struct_size = 40 if is_64bits else 32
@@ -49,9 +49,8 @@ def EnableSFlow(net):
     quietRun(sflow)
 
   collector = environ.get('COLLECTOR','127.0.0.1') # 127.0.0.1 default
-  sampling = environ.get('SAMPLING','10')
-  polling = environ.get('POLLING','10')
+  sampling = environ.get('SAMPLING',str(sampling_rate))
+  polling = environ.get('POLLING',str(polling_rate))
   ifname = getIfInfo(collector)[0]
-  
   configSFlow(net,collector,ifname,sampling,polling)
   

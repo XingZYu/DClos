@@ -1,17 +1,3 @@
-# Copyright (C) 2016 Nippon Telegraph and Telephone Corporation.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-# implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 from ryu.base import app_manager
 from operator import attrgetter
 
@@ -24,6 +10,8 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import *
 from ryu.lib.packet import ether_types
 from ryu.lib import hub
+import sys
+sys.path.append("..")
 from config.read import *
 
 
@@ -36,8 +24,7 @@ class SimpleMonitor13(app_manager.RyuApp):
         print(self.net_info)
         # self.monitor_thread = hub.spawn(self._monitor)
 
-    @set_ev_cls(ofp_event.EventOFPStateChange,
-                [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
         datapath = ev.datapath
         if ev.state == MAIN_DISPATCHER:
@@ -96,6 +83,7 @@ class SimpleMonitor13(app_manager.RyuApp):
 
         kwargs = dict(eth_type=ether_types.ETH_TYPE_ARP, arp_tpa=(switch_info['ip'][0],switch_info['ip'][1]))
         match = parser.OFPMatch(**kwargs)
+        
         self.goto_table(datapath, 4, match, gototable=1)
 
         # table 1: go to which host
@@ -109,8 +97,6 @@ class SimpleMonitor13(app_manager.RyuApp):
             kwargs = dict(eth_type=ether_types.ETH_TYPE_ARP, arp_tpa=host_ip)
             match = parser.OFPMatch(**kwargs)
             self.add_flow(datapath, 1, match, actions, table_id=1)
-
-
 
 
         # match flow from the switch host
@@ -150,8 +136,8 @@ class SimpleMonitor13(app_manager.RyuApp):
             port = switch_info['switch'][switch_id]
             target_swtich = self.net_info[switch_id]
             target_ip = target_swtich['ip']
-            print '----------------------'
-            print target_swtich, target_swtich['id']
+            print ('----------------------')
+            print (target_swtich, target_swtich['id'])
 
             # table 2: match which switch dst is, multipath by group table
 
@@ -173,11 +159,6 @@ class SimpleMonitor13(app_manager.RyuApp):
             self.add_flow(datapath, 1, match_1, actions, table_id=3)
             self.add_flow(datapath, 1, match_2, actions, table_id=3)
 
-
-
-        
-            
-
         
 
         # no match in table 0, goto table 3
@@ -198,12 +179,12 @@ class SimpleMonitor13(app_manager.RyuApp):
         msg = ev.msg
         pkt = packet.Packet(msg.data)
         # eth = pkt.get_protocols(ethernet.ethernet)
-        pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
-        pkt_icmp = pkt.get_protocol(icmp.icmp)
-        pkt_arp = pkt.get_protocol(arp.arp)
-        print('icmp',pkt_icmp)
-        print('pkt_ipv4', pkt_ipv4)
-        print('arp', pkt_arp)
+        # pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
+        # pkt_icmp = pkt.get_protocol(icmp.icmp)
+        # pkt_arp = pkt.get_protocol(arp.arp)
+        # print('icmp',pkt_icmp)
+        # print('pkt_ipv4', pkt_ipv4)
+        # print('arp', pkt_arp)
         # in_port = msg.match['in_port']
         # ipv4_src = eth.src
         # ipv4_dst = eth.dst

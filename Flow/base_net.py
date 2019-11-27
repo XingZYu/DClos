@@ -8,10 +8,11 @@ class BaseNet(Mininet):
         servername = server.name
         clientname = client.name
         print clientname + '->' + servername
+        
         server.cmd('iperf -s -p ' + str(port) +'-i 1 > data/' + servername + 'B' + clientname +'&')
-        print 'iperf -s -p ' + str(port) +'-i 1 > data/' + servername + 'B' + clientname +'&'
+        # print 'iperf -s -p ' + str(port) +'-i 1 > data/' + servername + 'B' + clientname +'&'
         client.cmd('iperf -t ' + str(time) + ' -c ' + server.IP() + ' -b ' + bw + ' -p ' + str(port) +' -i 1 > data/' + clientname +'T' + servername +'&')
-        print 'iperf -t ' + str(time) + ' -c ' + server.IP() + ' -b ' + bw + ' -p ' + str(port) +' -i 1 > data/' + clientname +'T' + servername +'&'
+        # print 'iperf -t ' + str(time) + ' -c ' + server.IP() + ' -b ' + bw + ' -p ' + str(port) +' -i 1 > data/' + clientname +'T' + servername +'&'
         # iperf -t 10 -c 10.0.0.2 -b 10M > client&
 
     def iperf_all_to_all(self, bw = '1M', time = 10):
