@@ -7,9 +7,11 @@ import json
 import sys
 sys.path.append("..")
 from SFlow.enable_sflow import EnableSFlow
+from Flow.base_net import BaseNet
+
 
 def topology(remoteip, ofversion, file = '../config/topo.json'):
-    net = Mininet(controller=RemoteController,switch=OVSSwitch)
+    net = BaseNet(controller=RemoteController,switch=OVSSwitch)
     c1 = net.addController("c1",controller=RemoteController,ip=remoteip,port=6653)
     switch_dict = {}
     switch_list = []
@@ -40,6 +42,7 @@ def topology(remoteip, ofversion, file = '../config/topo.json'):
     c1.start()
      
     EnableSFlow(net, sampling_rate=10, polling_rate=10)
+    net.mouse_elephant_flow()
     CLI(net)
     
 	
@@ -47,6 +50,6 @@ def topology(remoteip, ofversion, file = '../config/topo.json'):
     net.stop()
 
 if __name__ == "__main__":
-    setLogLevel("info")
+    setLogLevel("debug")
     topology("127.0.0.1","OpenFlow13")
     

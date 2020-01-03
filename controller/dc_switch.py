@@ -120,10 +120,10 @@ class SimpleMonitor13(app_manager.RyuApp):
             watch_group = ofproto_v1_3.OFPQ_ALL
             buckets = []
             for switch_id in switch_info['switch']:
-                weight = 1
+                weight = 10
                 # if direct send, increase weight
                 if switch_id == i:
-                    weight = 2
+                    weight = 20
                 port = switch_info['switch'][switch_id]
                 actions = [parser.OFPActionOutput(port)]
                 buckets.append(parser.OFPBucket(weight, watch_port, watch_group, actions))
@@ -167,7 +167,7 @@ class SimpleMonitor13(app_manager.RyuApp):
         self.goto_table(datapath, 0, match, gototable=3, now_table=0)
 
         # no match in table 3, packetin
-        self.add_flow(datapath, 0, match, actions, table_id=3)
+        # self.add_flow(datapath, 0, match, actions, table_id=3)
                                         
         
 
