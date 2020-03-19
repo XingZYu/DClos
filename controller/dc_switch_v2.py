@@ -23,6 +23,8 @@ DEFAULT_BW = 10000000
 
 MAX_PATHS = 2
 
+MAX_GROUPS = 10000
+
 class DC_Switch(app_manager.RyuApp):
     """
     Multipath Controller
@@ -42,12 +44,13 @@ class DC_Switch(app_manager.RyuApp):
     """
     def __init__(self, *args, **kwargs):
         super(DC_Switch, self).__init__(*args, **kwargs)
-
+        self.topology_api_app = self
         self.arp_table = {}
         self.hosts = {}
         self.dp_list = {}
         self.switches = []
-        self.group_ids = {}
+        self.multipath_groups = {}
+        self.FF_groups = {}
         self.adjacency = defaultdict(dict)
         self.bandwidths = defaultdict(lambda: defaultdict(lambda: DEFAULT_BW))
 
@@ -68,6 +71,7 @@ class DC_Switch(app_manager.RyuApp):
                 else:
                     stack.append((next_dp, path + [next_dp]))
         self.logger.info("Available paths from %s to %s : %s", src, dst, paths)
+        self.logger.info(self.adjacency)
         return paths
 
     def get_link_cost(self, s1, s2):
@@ -114,18 +118,23 @@ class DC_Switch(app_manager.RyuApp):
             paths_p.append(p)
         return paths_p
 
-    def generate_openflow_gid(self):
+    def generate_openflow_gid(self, group_type = 'SELECT'):
         '''
-        Returns a random OpenFlow group id
+        Returns a OpenFlow group id
         '''
-        n = random.randint(0, 2**32)
-        while n in self.group_ids:
-            n = random.randint(0, 2**32)
-        return n
+        if group_type == 'SELECT':
+            if len(self.multipath_groups) == MAX_GROUPS:
+                raise Exception('Maximum group number reached')
+            return len(self.multipath_groups) + 1
+        else:
+            return MAX_GROUPS + len(self.FF_groups) + 1
 
     def install_paths(self, src, first_port, dst, last_port, ip_src, ip_dst):
         computation_start = time.time()
         paths = self.get_optimal_paths(src, dst)
+        # self.logger.info(paths)
+        if len(paths) == 0:
+            return None
         pw = []
         for path in paths:
             pw.append(self.get_path_cost(path))
@@ -171,24 +180,59 @@ class DC_Switch(app_manager.RyuApp):
                     group_id = None
                     group_new = False
 
-                    if (node, src, dst) not in self.group_ids:
+                    if (node, src, dst) not in self.multipath_groups:
                         group_new = True
-                        self.group_ids[
+                        self.multipath_groups[
                             node, src, dst] = self.generate_openflow_gid()
-                    group_id = self.group_ids[node, src, dst]
+                    group_id = self.multipath_groups[node, src, dst]
 
                     buckets = []
-                    for port, weight in out_ports:
+                    for i in range(len(out_ports)):
+                        ff_group_new = False
+                        (port, weight) = out_ports[i]
+                        if (node, src, dst, port) not in self.FF_groups: 
+                            ff_group_new = True
+                            self.FF_groups[
+                                node, src, dst, port] = self.generate_openflow_gid(
+                                        group_type = 'FF'
+                                        )
+                        ff_group_id = self.FF_groups[node, src, dst, port]
+                        ff_action = [ofp_parser.OFPActionOutput(port)]
+                        ff_bucket = [ofp_parser.OFPBucket(
+                                watch_port = port,
+                                actions = ff_action
+                                )]
+                        for j in range(len(out_ports)):
+                            if j == i:
+                                continue
+                            ff_action = [ofp_parser.OFPActionOutput(out_ports[j][0])]
+                            ff_bucket.append(
+                                ofp_parser.OFPBucket(
+                                    watch_port = out_ports[j][0],
+                                    actions = ff_action
+                                    )
+                                )
                         bucket_weight = int(round((1 - weight/sum_of_pw) * 10))
-                        bucket_action = [ofp_parser.OFPActionOutput(port)]
+                        bucket_action = [ofp_parser.OFPActionGroup(ff_group_id)]
                         buckets.append(
                             ofp_parser.OFPBucket(
                                 weight=bucket_weight,
-                                watch_port=port,
-                                watch_group=ofp.OFPG_ANY,
                                 actions=bucket_action
                             )
                         )
+
+                        if ff_group_new:
+                            req = ofp_parser.OFPGroupMod(
+                                dp, ofp.OFPGC_ADD, ofp.OFPGT_FF, ff_group_id,
+                                ff_bucket
+                            )
+                            dp.send_msg(req)
+
+                        else:
+                            req = ofp_parser.OFPGroupMod(
+                                dp, ofp.OFPGC_MODIFY, ofp.OFPGT_FF,
+                                ff_group_id, ff_bucket)
+                            dp.send_msg(req)
 
                     if group_new:
                         req = ofp_parser.OFPGroupMod(
@@ -212,6 +256,7 @@ class DC_Switch(app_manager.RyuApp):
 
                     self.add_flow(dp, 32768, match_ip, actions)
                     self.add_flow(dp, 1, match_arp, actions)
+        # print "Path installation finished in ", time.time() - computation_start 
         return paths_with_ports[0][src][1]
 
     def add_flow(self, datapath, priority, match, actions, table_id=0, buffer_id=None):
@@ -292,6 +337,8 @@ class DC_Switch(app_manager.RyuApp):
                 h1 = self.hosts[src]
                 h2 = self.hosts[dst]
                 out_port = self.install_paths(h1[0], h1[1], h2[0], h2[1], src_ip, dst_ip)
+                if out_port == None:
+                    return 
                 self.install_paths(h2[0], h2[1], h1[0], h1[1], dst_ip, src_ip)
             elif arp_pkt.opcode == arp.ARP_REQUEST:
                 if dst_ip in self.arp_table:
@@ -300,6 +347,8 @@ class DC_Switch(app_manager.RyuApp):
                     h1 = self.hosts[src]
                     h2 = self.hosts[dst_mac]
                     out_port = self.install_paths(h1[0], h1[1], h2[0], h2[1], src_ip, dst_ip)
+                    if out_port == None:
+                        return 
                     self.install_paths(h2[0], h2[1], h1[0], h1[1], dst_ip, src_ip) # reverse
         
         actions = [parser.OFPActionOutput(out_port)]
