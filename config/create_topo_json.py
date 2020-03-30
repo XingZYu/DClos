@@ -2,20 +2,12 @@ import json
 from itertools import combinations
 
 def create_pod_datacenter(pod_num):
-<<<<<<< HEAD
     switch_list = [f's{i}' for i in range(1, pod_num + 1)]
     host_name_list = [f's{i}h1' for i in range(1, pod_num + 1)]
     ip_range_list = [f'10.0.{i}.0' for i in range(1, pod_num + 1)]
     ip_mask = '255.255.255.0'
     host_ip_list = [f'10.0.{i}.1' for i in range(1, pod_num + 1)]
     host_mac_list = ['00:00:00:00:00:' + str(i).rjust(2,'0') for i in range(1, pod_num + 1)]
-=======
-    switch_list = [f's{i}' for i in range(pod_num)]
-    host_name_list = [f's{i}h1' for i in range(pod_num)]
-    ip_range_list = [f'10.0.{i}.0' for i in range(pod_num)]
-    ip_mask = '255.255.255.0'
-    host_ip_list = [f'10.0.{i}.1' for i in range(pod_num)]
->>>>>>> cc635f2eb8349a53ca21700160a9865d95c80343
 
     pod_list = []
     for i in range(pod_num):
@@ -27,10 +19,7 @@ def create_pod_datacenter(pod_num):
                 {
                     "name": host_name_list[i],
                     "ip": host_ip_list[i],
-<<<<<<< HEAD
                     "mac": host_mac_list[i],
-=======
->>>>>>> cc635f2eb8349a53ca21700160a9865d95c80343
                 }
             ],
         }
