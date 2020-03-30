@@ -6,11 +6,12 @@ from mininet.log import setLogLevel
 import json
 import sys
 sys.path.append("..")
-from SFlow.enable_sflow import EnableSFlow
+# from SFlow.enable_sflow import EnableSFlow
 from Flow.base_net import BaseNet
 
 
-def topology(remoteip, ofversion, file = '../config/topo.json'):
+
+def topology(remoteip, ofversion, file = 'config/2pod_topo.json'):
     net = BaseNet(controller=RemoteController,switch=OVSSwitch)
     c1 = net.addController("c1",controller=RemoteController,ip=remoteip,port=6653)
     switch_dict = {}
@@ -41,13 +42,32 @@ def topology(remoteip, ofversion, file = '../config/topo.json'):
     print("***Starting network")
     c1.start()
      
-    EnableSFlow(net, sampling_rate=10, polling_rate=10)
-    net.mouse_elephant_flow()
-    CLI(net)
-    
-	
+    # EnableSFlow(net, sampling_rate=10, polling_rate=10)
+    # do something
+
+    simple_CLI(net)
+
+    #
+    # CLI(net)
     print("***Stoping network")
     net.stop()
+
+def simple_CLI(net):
+    while(True):
+        x = raw_input()
+        if x == 'exit':
+            break
+        if x == 'elephant':
+            net.mouse_elephant_flow()
+        elif x== 'traffic':
+            # read traffic
+            # param: traffic_arr time_arr
+
+            traffic_arr = [[[1000 for i in range(8)] for j in range(8)]]
+            time_arr = [10]
+            net.simulate_traffic(traffic_arr, time_arr)
+        elif x == 'cli':
+            CLI(net)
 
 if __name__ == "__main__":
     setLogLevel("debug")
