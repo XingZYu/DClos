@@ -230,9 +230,9 @@ class DC_Switch(app_manager.RyuApp):
                             )
                         )
                         
-                        self.logger.info(dir(buckets[-1]))
-                        bucket_id = buckets[-1].bucket_id
-                        self.port_bucket[dpid][port].append((group_id, bucket_id))
+                        # self.logger.info(dir(buckets[-1]))
+                        # bucket_id = buckets[-1].bucket_id
+                        # self.port_bucket[dpid][port].append((group_id, bucket_id))
 
                         if ff_group_new:
                             req = ofp_parser.OFPGroupMod(
@@ -348,10 +348,10 @@ class DC_Switch(app_manager.RyuApp):
         switch = ev.msg.datapath
         for p in ev.msg.body:
             # Openflow15i
-            self.logger.info(p.properties)
-            self.bandwidths[switch.id][p.port_no] = p.properties[0].curr_speed
+            # self.logger.info(p.properties)
+            # self.bandwidths[switch.id][p.port_no] = p.properties[0].curr_speed
             # Openflow13
-            # self.bandwidths[switch.id][p.port_no] = p.curr_speed
+            self.bandwidths[switch.id][p.port_no] = p.curr_speed
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -388,6 +388,10 @@ class DC_Switch(app_manager.RyuApp):
         
         out_port = ofproto.OFPP_FLOOD
 
+        data = None
+        if msg.buffer_id == ofproto.OFP_NO_BUFFER:
+            data = msg.data
+
         self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, eth.ethertype)
 
         if arp_pkt:
@@ -419,14 +423,13 @@ class DC_Switch(app_manager.RyuApp):
             self.arp_table[src_ip] = src
             h1 = self.hosts[src]
             h2 = self.hosts[dst]
-            self.install_paths(h1[0], h1[1], h2[0], h2[1], src_ip, dst_ip)
+            out_port = self.install_paths(h1[0], h1[1], h2[0], h2[1], src_ip, dst_ip)
             self.install_paths(h2[0], h2[1], h1[0], h1[1], dst_ip, src_ip)
-
+            
+            datapath = self.dp_list[self.hosts[src][0]]
+            in_port = ofproto.OFPP_CONTROLLER
+            
         actions = [parser.OFPActionOutput(out_port)]
-
-        data = None
-        if msg.buffer_id == ofproto.OFP_NO_BUFFER:
-            data = msg.data
 
         out = parser.OFPPacketOut(
             datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port,
