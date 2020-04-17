@@ -34,12 +34,12 @@ class FF_test(app_manager.RyuApp):
 
         if dpid == 3:
             buckets = [
-                parser.OFPBuckets(
-                    actions = [parser.OFPAcionOutput(2)],
+                parser.OFPBucket(
+                    actions = [parser.OFPActionOutput(2)],
                     watch_port = 2
                 ),
-                parser.OFPBuckets(
-                    actions = [parser.OFPAcionOutput(1)],
+                parser.OFPBucket(
+                    actions = [parser.OFPActionOutput(1)],
                     watch_port = 1
                 )
             ]
@@ -58,11 +58,11 @@ class FF_test(app_manager.RyuApp):
             datapath.send_msg(req)
 
             match = parser.OFPMatch(in_port = 1)
-            actions = parser.OFPActionGroup(1)
+            actions = [parser.OFPActionGroup(1)]
             self.add_flow(datapath, 1, match, actions)
 
             match = parser.OFPMatch(in_port = 2)
-            actions = parser.OFPActionGroup(2)
+            actions = [parser.OFPActionGroup(2)]
             self.add_flow(datapath, 1, match, actions)
 
         else:
@@ -74,22 +74,22 @@ class FF_test(app_manager.RyuApp):
                 eth_type=ether_types.ETH_TYPE_IP,
                 ipv4_dst = (ip_range, ip_mask)
                 )
-            actions = parser.OFPAcionOutput(1)
+            actions = [parser.OFPActionOutput(1)]
             self.add_flow(datapath, 2, match, actions)
 
             match = parser.OFPMatch(
                 eth_type=ether_types.ETH_TYPE_ARP,
                 arp_tpa = (ip_range, ip_mask)
                 )
-            actions = parser.OFPAcionOutput(1)
+            actions = [parser.OFPActionOutput(1)]
             self.add_flow(datapath, 2, match, actions)
 
             match = parser.OFPMatch(in_port = 1)
-            actions = parser.OFPAcionOutput(3)
+            actions = [parser.OFPActionOutput(3)]
             self.add_flow(datapath, 1, match, actions)
 
             match = parser.OFPMatch(in_port = 3)
-            actions = parser.OFPAcionOutput(2)
+            actions = [parser.OFPActionOutput(2)]
             self.add_flow(datapath, 1, match, actions)
             
     def add_flow(self, datapath, priority, match, actions, table_id = 0):

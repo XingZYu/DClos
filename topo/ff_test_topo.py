@@ -34,9 +34,9 @@ def create_topo(ofversion = "OpenFlow13", remoteip = "127.0.0.1"):
         controller.start()
 
     info( '*** Starting switches\n')
-    net.start("s1")
-    net.start("s2")
-    net.start("s3")
+    net.get("s1").start([c1])
+    net.get("s2").start([c1])
+    net.get("s3").start([c1])
 
     CLI(net)
     net.stop()
