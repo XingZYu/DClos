@@ -32,6 +32,15 @@ class FF_test(app_manager.RyuApp):
         parser = datapath.ofproto_parser
         dpid = datapath.id
         
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                  ofproto.OFPCML_NO_BUFFER)]
+        buckets = [parser.OFPBucket(actions = actions)]
+        req = parser.OFPGroupMod(
+                datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_INDIRECT, 0, 
+                buckets
+            )
+        datapath.send_msg(req)
+
         if dpid == 4:
             
             for i in range(1, 3):
@@ -60,8 +69,12 @@ class FF_test(app_manager.RyuApp):
                     watch_port = 2
                 ),
                 parser.OFPBucket(
-                    actions = [parser.OFPActionOutput(3)],
-                    watch_port = 3
+                    actions = [parser.OFPActionOutput(1)],
+                    watch_port = 1
+                ),
+                parser.OFPBucket(
+                    actions = [parser.OFPActionGroup(0)],
+                    watch_port = ofproto.OFPP_CONTROLLER
                 )
             ]
 
@@ -71,10 +84,12 @@ class FF_test(app_manager.RyuApp):
                 )
             datapath.send_msg(req)
 
-            buckets[0] = parser.OFPBucket(
-                    actions = [parser.OFPActionOutput(1)],
-                    watch_port = 1,
-                    )
+            # buckets[0] = parser.OFPBucket(
+            #         actions = [parser.OFPActionOutput(1)],
+            #         watch_port = 1,
+            #         )
+           
+            buckets[1], buckets[0] = buckets[0], buckets[1]
             req = parser.OFPGroupMod(
                     datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, 2, 
                     buckets
@@ -129,9 +144,13 @@ class FF_test(app_manager.RyuApp):
             actions = [parser.OFPActionGroup(1)]
             self.add_flow(datapath, 1, match, actions)
             
-            match = parser.OFPMatch(in_port = 4)
+            match = parser.OFPMatch(in_port = 3)
             actions = [parser.OFPActionOutput(2)]
             self.add_flow(datapath, 1, match, actions)
+        
+        match = parser.OFPMatch()
+        actions = [parser.OFPActionGroup(0)]
+        self.add_flow(datapath, 0, match, actions)
 
     def add_flow(self, datapath, priority, match, actions, table_id = 0):
         ofproto = datapath.ofproto
@@ -172,4 +191,4 @@ class FF_test(app_manager.RyuApp):
 
         dpid = datapath.id
 
-        self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+        self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, eth.ethertype)
