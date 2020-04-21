@@ -31,16 +31,37 @@ class FF_test(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         dpid = datapath.id
+        
+        if dpid == 4:
+            
+            for i in range(1, 3):
+                ip_range = ['10', '0', str(i), '0']
+                ip_range = '.'.join(ip_range)
+                ip_mask = '255.255.255.0'
 
-        if dpid == 3:
+                match = parser.OFPMatch(
+                    eth_type=ether_types.ETH_TYPE_IP,
+                    ipv4_src = (ip_range, ip_mask)
+                    )
+                actions = [parser.OFPActionOutput(i)]
+                self.add_flow(datapath, 1, match, actions)
+
+                match = parser.OFPMatch(
+                    eth_type=ether_types.ETH_TYPE_ARP,
+                    arp_spa = (ip_range, ip_mask)
+                    )
+                actions = [parser.OFPActionOutput(i)]
+                self.add_flow(datapath, 1, match, actions)
+            
+        elif dpid == 3:
             buckets = [
                 parser.OFPBucket(
                     actions = [parser.OFPActionOutput(2)],
                     watch_port = 2
                 ),
                 parser.OFPBucket(
-                    actions = [parser.OFPActionOutput(1)],
-                    watch_port = 1
+                    actions = [parser.OFPActionOutput(3)],
+                    watch_port = 3
                 )
             ]
 
@@ -50,7 +71,10 @@ class FF_test(app_manager.RyuApp):
                 )
             datapath.send_msg(req)
 
-            buckets = buckets[::-1]
+            buckets[0] = parser.OFPBucket(
+                    actions = [parser.OFPActionOutput(1)],
+                    watch_port = 1,
+                    )
             req = parser.OFPGroupMod(
                     datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, 2, 
                     buckets
@@ -84,14 +108,31 @@ class FF_test(app_manager.RyuApp):
             actions = [parser.OFPActionOutput(1)]
             self.add_flow(datapath, 2, match, actions)
 
-            match = parser.OFPMatch(in_port = 1)
-            actions = [parser.OFPActionOutput(3)]
-            self.add_flow(datapath, 1, match, actions)
+            buckets = [
+                parser.OFPBucket(
+                    actions = [parser.OFPActionOutput(3)],
+                    watch_port = 3
+                ),
+                parser.OFPBucket(
+                    actions = [parser.OFPActionOutput(2)],
+                    watch_port = 2
+                )
+            ]
 
-            match = parser.OFPMatch(in_port = 3)
-            actions = [parser.OFPActionOutput(2)]
+            req = parser.OFPGroupMod(
+                    datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, 1, 
+                    buckets
+                )
+            datapath.send_msg(req)
+
+            match = parser.OFPMatch(in_port = 1)
+            actions = [parser.OFPActionGroup(1)]
             self.add_flow(datapath, 1, match, actions)
             
+            match = parser.OFPMatch(in_port = 4)
+            actions = [parser.OFPActionOutput(2)]
+            self.add_flow(datapath, 1, match, actions)
+
     def add_flow(self, datapath, priority, match, actions, table_id = 0):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser

@@ -14,7 +14,8 @@ def create_topo(ofversion = "OpenFlow13", remoteip = "127.0.0.1"):
     net.addSwitch('s1', protocols = ofversion)
     net.addSwitch('s2', protocols = ofversion)
     net.addSwitch('s3', protocols = ofversion)
-    
+    net.addSwitch('s4', protocols = ofversion)
+
     info("*** Add Host\n")
     net.addHost("s1h1", ip = "10.0.1.1")
     net.addHost("s2h1", ip = "10.0.2.1")
@@ -25,7 +26,10 @@ def create_topo(ofversion = "OpenFlow13", remoteip = "127.0.0.1"):
     net.addLink('s2', 's3', 3, 2)
     net.addLink('s1', 's1h1', 1)
     net.addLink('s2', 's2h1', 1)
-    
+    net.addLink('s1', 's4', 4, 1)
+    net.addLink('s2', 's4', 4, 2)
+    net.addLink('s3', 's4', 3, 3)
+
     info( '*** Starting network\n')
     net.build()
     
@@ -37,6 +41,7 @@ def create_topo(ofversion = "OpenFlow13", remoteip = "127.0.0.1"):
     net.get("s1").start([c1])
     net.get("s2").start([c1])
     net.get("s3").start([c1])
+    net.get("s4").start([c1])
 
     CLI(net)
     net.stop()
