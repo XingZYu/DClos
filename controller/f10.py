@@ -60,11 +60,15 @@ class F10Switch(app_manager.RyuApp):
         # correctly.  The bug has been fixed in OVS v2.1.0.
         n = K // 2
 
+        # For switches 1 to K are downlink ports
+        # K+1 to 2K are uplink ports
+        # 2 * k port for sending down
+        # 2 * k - 1 port for sending up
         if layer == 1:
             # Action group 1: 
             # Received from hosts, send to uplinks
             buckets = []
-            for i in range(n + 1, K + 1):
+            for i in range(K + 1, 2 * K + 1, 2):
                 bucket_action = [parser.OFPActionOutput(i)]
                 buckets.append(parser.OFPBucket(
                             weight=1,
@@ -111,6 +115,7 @@ class F10Switch(app_manager.RyuApp):
                         self.network[datapath.id][dpid]['port1'],
                         self.network[datapath.id][dpid]['port2']
                         )
+                    out_port = out_port * 2 - 1
                     actions = [parser.OFPActionOutput(out_port)]
                     self.add_flow(datapath, 1, match, actions)
 
@@ -127,32 +132,30 @@ class F10Switch(app_manager.RyuApp):
             # Common Situation: receive packet from L1 switches
             # Randomly distribute flows to uplinks
             # If one uplink fail, go to the other
-            buckets = []
-            
-            for i in range(n + 1, K + 1):
-                buckets.append(
-                    parser.OFPBucket(
-                        actions = [parser.OFPActionOutput(i)],
-                        watch_port = i
+            for i in range(K + 1, 2 * K + 1, 2):
+                buckets = [parser.OFPBucket(
+                            actions = [parser.OFPActionOutput(i)],
+                            watch_port = i
+                        )]
+                
+                for j in range(1, n):
+                    out_port = (j * 2 + i) % K + K
+                    buckets.append(
+                        parser.OFPBucket(
+                            actions = [parser.OFPActionOutput(j)],
+                            watch_port = j
+                        )
                     )
+                
+                req = parser.OFPGroupMod(
+                    datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, (i + 1) // 2, 
+                    buckets
                 )
-            
-            req = parser.OFPGroupMod(
-                datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, 3, 
-                buckets
-            )
-            datapath.send_msg(req)
-
-            buckets = buckets[::-1]
-            req = parser.OFPGroupMod(
-                datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, 4, 
-                buckets
-            )
-            datapath.send_msg(req)
+                datapath.send_msg(req)
 
             buckets = []
-            for i in range(n + 1, K + 1):
-                bucket_action = [parser.OFPActionGroup(i)]
+            for i in range(K + 2, 2 * K + 1, 2):
+                bucket_action = [parser.OFPActionGroup(i // 2)]
                 buckets.append(parser.OFPBucket(
                     weight = 1,
                     actions = bucket_action
@@ -163,7 +166,7 @@ class F10Switch(app_manager.RyuApp):
             )
             datapath.send_msg(req)
 
-            for i in range(1, n + 1):
+            for i in range(1, K + 1, 2):
                 match = parser.OFPMatch(in_port = i)
                 actions = [parser.OFPActionGroup(0)]
                 self.add_flow(datapath, 1, match, actions, table_id = 1)
@@ -171,36 +174,37 @@ class F10Switch(app_manager.RyuApp):
             # Receive packets from L3 switches
             # If received from uplinks, meaning a failure in a L3-L2 link
             # Send to next uplink
-            for i in range(1, n + 1):
-                match = parser.OFPMatch(in_port = i + n)
-                actions = [parser.OFPActionOutput(n + 1 + (i % n))]
+            for i in range(1, K + 1, 2):
+                match = parser.OFPMatch(in_port = i + K + 1)
+                actions = [parser.OFPActionOutput(K + ((i + 2) % K))]
                 self.add_flow(datapath, 1, match, actions, table_id = 1)
 
         if layer == 3:
             # If no failure, send to the other link
             # If one link failed, send back
-            buckets_A = []
-            a_action = [parser.OFPActionOutput(2)]
-            b_action = [parser.OFPActionOutput(1)]
-            buckets_A = [parser.OFPBucket(actions = a_action, watch_port = 2),
-                         parser.OFPBucket(actions = b_action, watch_port = 1)]
-            buckets_B = buckets_A[::-1]
-            
-            req = parser.OFPGroupMod(
-                datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, 1, 
-                buckets_A
-            )
-            datapath.send_msg(req)
+            for in_port in range(1, K + 1, 2):
+                buckets = []
+                for i in range(1, n + 1):
+                    out_port = (in_port + 2 * i) % K
+                    if out_port == in_port:
+                        buckets.append(parser.OFPBucket(
+                            actions = [parser.OFPActionOutput(ofproto.OFPP_IN_PORT)],
+                            watch_port = ofproto.OFPP_IN_PORT
+                            ))
+                    else:
+                        buckets.append(parser.OFPBucket(
+                            actions = [parser.OFPActionOutput(out_port)],
+                            watch_port = out_port
+                        ))
+                req = parser.OFPGroupMod(
+                    datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, (in_port + 1) // 2, 
+                    buckets
+                )
+                datapath.send_msg(req)
 
-            req = parser.OFPGroupMod(
-                datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, 2, 
-                buckets_B
-            )
-            datapath.send_msg(req)
-
-            for in_port in range(1, n + 1):
+            for in_port in range(1, K + 1, 2):
                 match = parser.OFPMatch(in_port = in_port)
-                actions = [parser.OFPActionGroup(in_port)]
+                actions = [parser.OFPActionGroup((in_port + 1) // 2)]
                 
                 self.add_flow(datapath, 1, match, actions)
                                 
