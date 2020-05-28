@@ -41,6 +41,15 @@ class FF_test(app_manager.RyuApp):
             )
         datapath.send_msg(req)
 
+        actions = [parser.OFPActionOutput(ofproto.OFPP_IN_PORT,
+                  ofproto.OFPCML_NO_BUFFER)]
+        buckets = [parser.OFPBucket(actions = actions)]
+        req = parser.OFPGroupMod(
+                datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_INDIRECT, 10, 
+                buckets
+            )
+        datapath.send_msg(req)
+
         if dpid == 4:
             
             for i in range(1, 3):
@@ -69,12 +78,9 @@ class FF_test(app_manager.RyuApp):
                     watch_port = 2
                 ),
                 parser.OFPBucket(
-                    actions = [parser.OFPActionOutput(1)],
-                    watch_port = 1
-                ),
-                parser.OFPBucket(
-                    actions = [parser.OFPActionGroup(0)],
-                    watch_port = ofproto.OFPP_CONTROLLER
+                    actions = [parser.OFPActionGroup(10)],
+                    # actions = [parser.OFPActionGroup(0)],
+                    watch_group = 10
                 )
             ]
 
@@ -89,7 +95,11 @@ class FF_test(app_manager.RyuApp):
             #         watch_port = 1,
             #         )
            
-            buckets[1], buckets[0] = buckets[0], buckets[1]
+            buckets[0] = parser.OFPBucket(
+                    actions = [parser.OFPActionOutput(1)],
+                    watch_port = 1
+                    )
+
             req = parser.OFPGroupMod(
                     datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, 2, 
                     buckets
@@ -192,3 +202,7 @@ class FF_test(app_manager.RyuApp):
         dpid = datapath.id
 
         self.logger.info("packet in %s %s %s %s %s", dpid, src, dst, in_port, eth.ethertype)
+        
+        for p in pkt.protocols:
+            print(p)
+        print(p.data)

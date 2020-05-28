@@ -36,10 +36,11 @@ class ABTree:
         top_n = n << (L - 2)
         G = nx.Graph()
         top_sws = []
+        ip = '.'.join(base_ip)
         for i in range(top_n):
             self._swcnt += 1
             sw_name = 's{}'.format(self._swcnt)
-            G.add_node(sw_name, layer = L, pod = 0)
+            G.add_node(sw_name, layer = L, pod = 0, ip_range = ip)
             top_sws.append(sw_name)
 
         base_ip[4 - L] = str(int(base_ip[4 - L]) + 1)

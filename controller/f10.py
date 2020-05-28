@@ -60,6 +60,27 @@ class F10Switch(app_manager.RyuApp):
         # correctly.  The bug has been fixed in OVS v2.1.0.
         n = K // 2
 
+        match = parser.OFPMatch()
+        self.goto_table(datapath, 0, match, 1)
+
+        match = parser.OFPMatch(eth_type = 0x86DD)
+        actions = []
+        self.add_flow(datapath, 1, match, actions)
+
+        match = parser.OFPMatch()
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                          ofproto.OFPCML_NO_BUFFER)]
+        self.add_flow(datapath, 0, match, actions, table_id = 1)
+
+        actions = [parser.OFPActionOutput(ofproto.OFPP_IN_PORT,
+                  ofproto.OFPCML_NO_BUFFER)]
+        buckets = [parser.OFPBucket(actions = actions)]
+        req = parser.OFPGroupMod(
+                datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_INDIRECT, 100, 
+                buckets
+            )
+        datapath.send_msg(req)
+
         # For switches 1 to n are downlink ports
         # n+1 to K are uplink ports
         if layer == 1:
@@ -88,14 +109,21 @@ class F10Switch(app_manager.RyuApp):
                 ipv4_dst = self.hosts[datapath.id]
                 )
             actions = [parser.OFPActionOutput(1)]
-            self.add_flow(datapath, 1, match, actions)
+            self.add_flow(datapath, 2, match, actions)
 
             match = parser.OFPMatch(
                 eth_type=ether_types.ETH_TYPE_ARP,
                 arp_tpa = self.hosts[datapath.id]
                 )
             actions = [parser.OFPActionOutput(1)]
-            self.add_flow(datapath, 1, match, actions)
+            self.add_flow(datapath, 2, match, actions)
+            
+            # Received from L2 switches, send to backup path
+            for i in range(1, n+1):
+                match = parser.OFPMatch(in_port = i + n)
+                out_port = i % n + 1 + n
+                actions = [parser.OFPActionOutput(out_port)]
+                self.add_flow(datapath, 1, match, actions)
 
         if layer == 2:
             # Table 0
@@ -104,16 +132,33 @@ class F10Switch(app_manager.RyuApp):
             # Else go to table 1 (Table miss entry in table 0)
             for dpid in self.network.adj[datapath.id]:
                 if int(self.network.nodes[dpid]['layer']) == 1:
+                    out_port = min(
+                        self.network[datapath.id][dpid]['port1'],
+                        self.network[datapath.id][dpid]['port2']
+                        )
+
+                    buckets = [parser.OFPBucket(
+                        actions = [parser.OFPActionOutput(out_port)],
+                        watch_port = out_port
+                        )]
+                    for i in range(1, n):
+                        port = (out_port + i) % (K + 1)
+                        buckets.append(parser.OFPBucket(
+                            actions = [parser.OFPActionOutput(port)],
+                            watch_port = port
+                            ))
+                    req = parser.OFPGroupMod(
+                            datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_FF, out_port,
+                            buckets
+                        )
+                    datapath.send_msg(req)
+                     
                     match = parser.OFPMatch(
                         eth_type=ether_types.ETH_TYPE_IP,
                         ipv4_dst = (self.network.nodes[dpid]['ip_range'], 
                                     self.network.nodes[dpid]['ip_mask']),
                         )
-                    out_port = min(
-                        self.network[datapath.id][dpid]['port1'],
-                        self.network[datapath.id][dpid]['port2']
-                        )
-                    actions = [parser.OFPActionOutput(out_port)]
+                    actions = [parser.OFPActionGroup(out_port)]
                     self.add_flow(datapath, 1, match, actions)
 
                     match = parser.OFPMatch(
@@ -121,8 +166,8 @@ class F10Switch(app_manager.RyuApp):
                         arp_tpa = (self.network.nodes[dpid]['ip_range'], 
                                     self.network.nodes[dpid]['ip_mask']),
                         )
-                    actions = [parser.OFPActionOutput(out_port)]
-                    self.add_flow(datapath, 1, match, actions)
+                    actions = [parser.OFPActionGroup(out_port)]
+                    self.add_flow(datapath, 2, match, actions)
             
             # Table 1
             # If received from downlinks, send packet to Layer 3 switches 
@@ -185,8 +230,8 @@ class F10Switch(app_manager.RyuApp):
                     out_port = (in_port + i) % n + 1
                     if out_port == in_port:
                         buckets.append(parser.OFPBucket(
-                            actions = [parser.OFPActionOutput(ofproto.OFPP_IN_PORT)],
-                            watch_port = ofproto.OFPP_IN_PORT
+                            actions = [parser.OFPActionGroup(100)],
+                            watch_group = 100
                             ))
                     else:
                         buckets.append(parser.OFPBucket(
@@ -205,18 +250,6 @@ class F10Switch(app_manager.RyuApp):
                 
                 self.add_flow(datapath, 1, match, actions)
                                 
-        match = parser.OFPMatch()
-        self.goto_table(datapath, 0, match, 1)
-
-        match = parser.OFPMatch(eth_type = 0x86DD)
-        actions = []
-        self.add_flow(datapath, 1, match, actions)
-
-        match = parser.OFPMatch()
-        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
-                                          ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath, 0, match, actions, table_id = 1)
-
     def add_flow(self, datapath, priority, match, actions, table_id = 0):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
